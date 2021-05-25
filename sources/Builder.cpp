@@ -25,26 +25,35 @@ _config(config), _install(install), _pack(pack), _timeout(timeout)
       }
     });
   }
-  
-  bool success =
-      NewTask("-H. -B_builds -DCMAKE_INSTALL_PREFIX=_install "
-              "-DCMAKE_BUILD_TYPE=" + _config);
 
-  if (!success)
-    return;
+  auto task1 = async::spawn([this]{
+    bool success = NewTask(
+        "-H. -B_builds -DCMAKE_INSTALL_PREFIX=_install "
+        "-DCMAKE_BUILD_TYPE=" +
+        _config);
 
-  success = NewTask("--build _builds");
-  if (!success) return;
-
-  if (install) {
-    success = NewTask("--build _builds --target install");
     if (!success) return;
-  }
+});
 
-  if (pack){
-    success = NewTask("--build _builds --target package");
+  auto task2 = task1.then([this]{
+    bool success = NewTask("--build _builds");
     if (!success) return;
-  }
+});
+
+  auto task3 = task2.then([this]{
+    if (_install) {
+      bool success = NewTask("--build _builds --target install");
+      if (!success) return;
+    }
+});
+
+  auto task4 = task3.then([this]{
+    if (_pack) {
+      bool success = NewTask("--build _builds --target package");
+      if (!success) return;
+    }
+  });
+  task4.get();
 }
 
 bool Builder::NewTask(std::string task) {
@@ -62,7 +71,7 @@ bool Builder::NewTask(std::string task) {
 
   for (std::string line;
        _child.running() && std::getline(stream, line);) {
-    std::cout << line << std::endl;
+  //  std::cout << line << std::endl;
   }
 
   _child.wait();
