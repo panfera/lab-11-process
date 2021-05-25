@@ -1,11 +1,12 @@
 //
 // Created by hacker on 5/17/21.
 //
+//Copyright 2021 pan_fera
 
 #include "Builder.hpp"
 
 namespace bp = boost::process;
-
+std::atomic<bool> state = false;
 Builder::Builder(std::string config, bool install, bool pack, int timeout):
 _config(config), _install(install), _pack(pack), _timeout(timeout)
 {
@@ -14,8 +15,7 @@ _config(config), _install(install), _pack(pack), _timeout(timeout)
     return;
   }
 
-  if (_timeout > 0) {
-    auto timer = async::spawn([this] {
+   /* auto timer = async::spawn([this] {
       std::cout << "Timer started" << std::endl;
       std::this_thread::sleep_for(std::chrono::seconds(_timeout));
       if (_child.running()) {
@@ -23,8 +23,9 @@ _config(config), _install(install), _pack(pack), _timeout(timeout)
                   << std::endl << "Terminating" << std::endl;
         _child.terminate();
       }
-    });
-  }
+    });*/
+
+  auto start = std::chrono::high_resolution_clock::now();
 
   auto task1 = async::spawn([this]{
     bool success = NewTask(
@@ -52,8 +53,16 @@ _config(config), _install(install), _pack(pack), _timeout(timeout)
       bool success = NewTask("--build _builds --target package");
       if (!success) return;
     }
+    state = true;
+    std::cout<<state<<std::endl;
   });
-  task4.get();
+
+  int seconds = 0;
+  do{
+  auto end = std::chrono::high_resolution_clock::now();
+  seconds = std::chrono::duration_cast<std::chrono::seconds>
+      (end - start).count();}
+  while(seconds < _timeout && !state);
 }
 
 bool Builder::NewTask(std::string task) {
@@ -71,7 +80,7 @@ bool Builder::NewTask(std::string task) {
 
   for (std::string line;
        _child.running() && std::getline(stream, line);) {
-  //  std::cout << line << std::endl;
+    std::cout << line << std::endl;
   }
 
   _child.wait();
